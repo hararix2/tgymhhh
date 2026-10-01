@@ -194,6 +194,31 @@ button {
   opacity: .65;
 }
 
+.guest-continue {
+  width: 100%;
+  min-height: 40px;
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--white);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.guest-continue:hover {
+  border-color: #a9b17f;
+  background: #f8f9f3;
+}
+
+.guest-note {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.8;
+  text-align: center;
+}
+
 .auth-notice,
 .auth-config-note {
   margin: 14px 0 0;

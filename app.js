@@ -3,6 +3,7 @@ const arabicDigits = new Intl.NumberFormat('ar');
 const dateTimeFormatter = new Intl.DateTimeFormat('ar', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 const durationInput = $('#duration-input');
 const timerStorageKey = 'idda-rest-timer-v1';
+const guestStorageKey = 'idda-guest-workouts-v1';
 
 let workouts = [];
 let activeWorkout = null;
@@ -12,12 +13,81 @@ let timerAudioContext;
 let supabaseClient = null;
 let currentUserId = null;
 let authMode = 'login';
+let isGuestMode = false;
 
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
 }
 
+function loadGuestWorkouts() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(guestStorageKey));
+    return Array.isArray(saved) ? saved : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveGuestWorkouts(guestWorkouts) {
+  localStorage.setItem(guestStorageKey, JSON.stringify(guestWorkouts));
+}
+
+function guestApi(path, options = {}) {
+  const method = options.method || 'GET';
+  const guestWorkouts = loadGuestWorkouts();
+  if (method === 'GET' && path === '/api/workouts') return guestWorkouts;
+
+  if (method === 'POST' && path === '/api/workouts') {
+    const active = guestWorkouts.find((workout) => !workout.finishedAt);
+    if (active) return active;
+    const workout = { id: crypto.randomUUID(), startedAt: new Date().toISOString(), finishedAt: null, sets: [] };
+    guestWorkouts.unshift(workout);
+    saveGuestWorkouts(guestWorkouts);
+    return workout;
+  }
+
+  const finishMatch = path.match(/^\/api\/workouts\/([^/]+)\/finish$/);
+  if (method === 'POST' && finishMatch) {
+    const workout = guestWorkouts.find((entry) => entry.id === decodeURIComponent(finishMatch[1]));
+    if (!workout) throw new Error('لم نعثر على جلسة التمرين.');
+    workout.finishedAt = new Date().toISOString();
+    saveGuestWorkouts(guestWorkouts);
+    return workout;
+  }
+
+  const setsMatch = path.match(/^\/api\/workouts\/([^/]+)\/sets$/);
+  if (method === 'POST' && setsMatch) {
+    const body = JSON.parse(options.body || '{}');
+    const exercise = typeof body.exercise === 'string' ? body.exercise.trim().slice(0, 60) : '';
+    const reps = Number(body.reps);
+    const weight = Number(body.weight);
+    if (!exercise || !Number.isInteger(reps) || reps < 1 || reps > 1000 || !Number.isFinite(weight) || weight < 0 || weight > 10000) {
+      throw new Error('أدخل تمرينًا وتكرارات ووزنًا صالحًا.');
+    }
+    const workout = guestWorkouts.find((entry) => entry.id === decodeURIComponent(setsMatch[1]) && !entry.finishedAt);
+    if (!workout) throw new Error('جلسة التمرين غير موجودة أو منتهية.');
+    const set = { id: crypto.randomUUID(), exercise, reps, weight, completedAt: new Date().toISOString() };
+    workout.sets.push(set);
+    saveGuestWorkouts(guestWorkouts);
+    return set;
+  }
+
+  const deleteSetMatch = path.match(/^\/api\/workouts\/([^/]+)\/sets\/([^/]+)$/);
+  if (method === 'DELETE' && deleteSetMatch) {
+    const workout = guestWorkouts.find((entry) => entry.id === decodeURIComponent(deleteSetMatch[1]) && !entry.finishedAt);
+    if (!workout) throw new Error('جلسة التمرين غير موجودة أو منتهية.');
+    const originalLength = workout.sets.length;
+    workout.sets = workout.sets.filter((set) => set.id !== decodeURIComponent(deleteSetMatch[2]));
+    if (workout.sets.length === originalLength) throw new Error('لم نعثر على المجموعة.');
+    saveGuestWorkouts(guestWorkouts);
+    return { ok: true };
+  }
+
+  throw new Error('المسار غير موجود.');
+}
+
 async function api(path, options = {}) {
+  if (isGuestMode) return guestApi(path, options);
   if (!supabaseClient) throw new Error('تعذر تهيئة تسجيل الدخول.');
   const { data: { session } } = await supabaseClient.auth.getSession();
   if (!session) throw new Error('سجّل الدخول للمتابعة.');
@@ -67,9 +137,11 @@ function authErrorMessage(error) {
 
 async function applyAuthSession(session) {
   const user = session?.user;
+  isGuestMode = false;
   $('#auth-gate').hidden = Boolean(user);
   $('#app-content').hidden = !user;
   $('#account-meta').hidden = !user;
+  $('#sign-out').textContent = 'تسجيل الخروج';
 
   if (!user) {
     currentUserId = null;
@@ -88,8 +160,20 @@ async function applyAuthSession(session) {
   }
 }
 
+async function enterGuestMode() {
+  isGuestMode = true;
+  currentUserId = 'guest';
+  $('#auth-gate').hidden = true;
+  $('#app-content').hidden = false;
+  $('#account-meta').hidden = false;
+  $('#account-email').textContent = 'ضيف';
+  $('#sign-out').textContent = 'إنهاء وضع الضيف';
+  await refreshData();
+}
+
 $('#auth-mode-login').addEventListener('click', () => setAuthMode('login'));
 $('#auth-mode-signup').addEventListener('click', () => setAuthMode('signup'));
+$('#guest-continue').addEventListener('click', () => { void enterGuestMode(); });
 
 $('#auth-form').addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -116,6 +200,17 @@ $('#auth-form').addEventListener('submit', async (event) => {
 });
 
 $('#sign-out').addEventListener('click', async () => {
+  if (isGuestMode) {
+    isGuestMode = false;
+    currentUserId = null;
+    workouts = [];
+    activeWorkout = null;
+    $('#auth-gate').hidden = false;
+    $('#app-content').hidden = true;
+    $('#account-meta').hidden = true;
+    setAuthMode('login');
+    return;
+  }
   const { error } = await supabaseClient.auth.signOut();
   if (error) showNotice(authErrorMessage(error));
 });
