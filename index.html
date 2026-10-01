@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#171a16" />
+  <meta name="description" content="سجل تمارينك ومجموعاتك مع مؤقّت راحة محلي." />
+  <title>عدة | سجل التمرين</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/app.js" defer></script>
+</head>
+
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="عدة، الصفحة الرئيسية">
+      <span class="brand-mark" aria-hidden="true">ع</span>
+      <span class="brand-name">عِدّة<span class="brand-period">.</span></span>
+    </a>
+    <div class="topbar-meta" id="account-meta" hidden><span class="status-dot"></span><span
+        id="account-email"></span><button id="sign-out" class="sign-out-button" type="button">تسجيل الخروج</button>
+    </div>
+  </header>
+
+  <main class="page-shell">
+    <section id="auth-gate" class="auth-gate" aria-labelledby="auth-heading">
+      <div class="auth-panel panel">
+        <p class="eyebrow">حسابك التدريبي</p>
+        <h1 id="auth-heading">مرحبًا بعودتك</h1>
+        <p id="auth-copy" class="auth-copy">سجّل الدخول لمتابعة جلساتك.</p>
+        <div id="auth-modes" class="auth-modes" role="group" aria-label="نوع الدخول">
+          <button id="auth-mode-login" type="button" aria-pressed="true">تسجيل الدخول</button>
+          <button id="auth-mode-signup" type="button" aria-pressed="false">إنشاء حساب</button>
+        </div>
+        <form id="auth-form" class="auth-form">
+          <div>
+            <label class="field-label" for="auth-email">البريد الإلكتروني</label>
+            <input id="auth-email" class="text-input" type="email" autocomplete="email" required />
+          </div>
+          <div>
+            <label class="field-label" for="auth-password">كلمة المرور</label>
+            <input id="auth-password" class="text-input" type="password" minlength="6" autocomplete="current-password"
+              required />
+          </div>
+          <button id="auth-submit" class="auth-submit" type="submit">دخول</button>
+        </form>
+        <p id="auth-notice" class="auth-notice" role="status" aria-live="polite" hidden></p>
+        <p id="auth-config-note" class="auth-config-note" hidden>أضف متغيري البيئة SUPABASE_URL وSUPABASE_ANON_KEY، ثم
+          أعد تشغيل الخادم.</p>
+      </div>
+    </section>
+
+    <div id="app-content" hidden>
+      <section class="page-heading">
+        <div>
+          <p class="eyebrow">مساحة تدريبك</p>
+          <h1>كل مجموعة <span>تُحسب.</span></h1>
+          <p class="heading-copy">ركّز على التمرين. نحن نهتم بالباقي.</p>
+        </div>
+        <div class="session-badge"><span class="session-badge-mark">01</span><span>سجّل تقدمك<br /><strong>مجموعةً بعد
+              مجموعة</strong></span></div>
+      </section>
+
+      <div class="dashboard-grid">
+        <section class="training-panel panel" aria-labelledby="workout-title">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">الجلسة الحالية</p>
+              <h2 id="workout-title">تمرين اليوم</h2>
+            </div>
+            <span class="live-label"><span class="status-dot"></span><span id="workout-state">جارٍ التحميل</span></span>
+          </div>
+
+          <div class="workout-summary" id="workout-summary">
+            <span class="summary-item"><strong id="set-count">٠</strong><span>مجموعة</span></span>
+            <span class="summary-rule"></span>
+            <span class="summary-item"><strong id="exercise-count">٠</strong><span>تمرين</span></span>
+            <span class="summary-rule"></span>
+            <span class="summary-item"><strong id="elapsed-time">٠٠:٠٠</strong><span>الوقت</span></span>
+          </div>
+
+          <form id="set-form" class="set-form">
+            <div class="form-field exercise-field">
+              <label class="field-label" for="exercise-input">التمرين</label>
+              <input id="exercise-input" class="text-input" list="exercise-options" maxlength="60"
+                placeholder="مثال: ضغط الصدر" autocomplete="off" required />
+              <datalist id="exercise-options">
+                <option value="ضغط الصدر"></option>
+                <option value="سكوات"></option>
+                <option value="رفعة ميتة"></option>
+                <option value="سحب أمامي"></option>
+                <option value="ضغط كتف"></option>
+                <option value="بايسبس"></option>
+                <option value="ترايسبس"></option>
+                <option value="اندفاع"></option>
+                <option value="تمرين مخصص"></option>
+              </datalist>
+            </div>
+            <div class="form-field"><label class="field-label" for="weight-input">الوزن <span>(كجم)</span></label><input
+                id="weight-input" class="text-input numeric-input" type="number" min="0" max="10000" step="0.5"
+                value="0" required /></div>
+            <div class="form-field"><label class="field-label" for="reps-input">التكرارات</label><input id="reps-input"
+                class="text-input numeric-input" type="number" min="1" max="1000" step="1" value="10" required /></div>
+            <button class="add-set-button" type="submit"><span class="button-plus"
+                aria-hidden="true">+</span><span>إضافة مجموعة</span></button>
+          </form>
+
+          <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+          <div class="sets-section">
+            <div class="section-line">
+              <h3>مجموعات اليوم</h3><span class="section-count" id="sets-caption">٠ مجموعات</span>
+            </div>
+            <div id="sets-list" class="sets-list"></div>
+            <div id="empty-sets" class="empty-state"><span class="empty-mark">↳</span><span>لا توجد مجموعات بعد. ابدأ
+                بأول مجموعة.</span></div>
+          </div>
+
+          <div class="workout-footer"><span id="started-label">تبدأ جلستك مع أول مجموعة</span><button
+              id="finish-workout" class="text-button" type="button" disabled>إنهاء التمرين <span
+                aria-hidden="true">←</span></button></div>
+        </section>
+
+        <aside class="side-column">
+          <section class="timer-panel panel" aria-labelledby="timer-title">
+            <div class="panel-heading timer-heading">
+              <div>
+                <p class="eyebrow">استعد للمجموعة التالية</p>
+                <h2 id="timer-title">وقت الراحة</h2>
+              </div><span class="timer-icon" aria-hidden="true">◷</span>
+            </div>
+            <div class="timer-face" id="timer-face">
+              <span class="timer-kicker" id="timer-caption">جاهز؟</span>
+              <strong id="timer-display" aria-live="off">01:30</strong>
+              <span class="timer-subtitle" id="timer-subtitle">دقيقة ونصف</span>
+            </div>
+            <div class="timer-controls"><button id="timer-toggle" class="timer-primary" type="button">ابدأ
+                الراحة</button><button id="timer-add" class="timer-secondary" type="button"
+                aria-label="إضافة 30 ثانية">+٣٠ث</button><button id="timer-reset" class="timer-secondary timer-reset"
+                type="button" aria-label="إعادة ضبط المؤقّت">↺</button></div>
+            <label class="duration-control" for="duration-input"><span>مدة الراحة الافتراضية</span><span
+                class="duration-input-wrap"><input id="duration-input" type="number" min="15" max="600" step="15"
+                  value="90" /><span>ث</span></span></label>
+          </section>
+
+          <section class="history-panel panel" aria-labelledby="history-title">
+            <div class="panel-heading history-heading">
+              <div>
+                <p class="eyebrow">تقدمك محفوظ</p>
+                <h2 id="history-title">الجلسات السابقة</h2>
+              </div><span class="history-total" id="history-total">٠</span>
+            </div>
+            <div id="history-list" class="history-list"></div>
+            <div id="empty-history" class="history-empty">ستظهر جلساتك المنتهية هنا.</div>
+          </section>
+
+          <p class="local-note"><span aria-hidden="true">⌂</span> جلساتك مرتبطة بحسابك.</p>
+        </aside>
+      </div>
+      <footer class="page-footer"><span>عِدّة <span class="brand-period">.</span> سجّلها، ثم ارفعها.</span><span>حسابك ·
+          بياناتك خاصة</span></footer>
+    </div>
+  </main>
+</body>
+
+</html>
